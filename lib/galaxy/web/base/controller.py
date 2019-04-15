@@ -394,8 +394,29 @@ class ExportsHistoryMixin(object):
             trans.response.set_content_type('application/x-tar')
         disposition = 'attachment; filename="%s"' % jeha.export_name
         trans.response.headers["Content-Disposition"] = disposition
+        print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
+        print(trans.app.object_store.get_filename(jeha.dataset))
         archive = trans.app.object_store.get_filename(jeha.dataset)
         return open(archive, mode='rb')
+
+
+
+
+    def serve_ready_historian(self, trans):#, jeha):
+        trans.response.set_content_type('application/x-tar')
+        disposition = 'attachment; filename="output_historian.zip"'
+        trans.response.headers["Content-Disposition"] = disposition
+        archive = trans.app.object_store.get_filename(jeha.dataset)
+        return open(archive, mode='rb')
+
+    def queue_history_write_up(self, trans, history):
+        historian = trans.app.toolbox.get_tool('__HISTORIAN__')
+        params = {
+            'history_to_export': history
+        }
+        historian.execute(trans , incoming=params, history=history, set_output_hid=True)
+
+
 
     def queue_history_export(self, trans, history, gzip=True, include_hidden=False, include_deleted=False):
         # Convert options to booleans.

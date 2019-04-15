@@ -2283,6 +2283,10 @@ class SetMetadataTool(Tool):
             return self.exec_after_process(job_wrapper.app, inp_data, {}, job_wrapper.get_param_dict(), job=job)
 
 
+class HistorianTool(Tool):
+    tool_type = 'historian'
+
+
 class ExportHistoryTool(Tool):
     tool_type = 'export_history'
 

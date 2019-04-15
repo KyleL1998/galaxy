@@ -810,6 +810,48 @@ class WorkflowController(BaseUIController, SharableMixin, UsesStoredWorkflowMixi
         redirect_url = url_for('/') + 'workflows/list?status=' + status + '&message=%s' % escape(message)
         return trans.response.send_redirect(redirect_url)
 
+
+
+
+
+    @web.expose
+    def export_writeup(self, trans, job_ids=None, dataset_ids=None, dataset_collection_ids=None, workflow_name=None, dataset_names=None, dataset_collection_names=None):
+        user = trans.get_user()
+        history = trans.get_history()
+        if not user:
+            return trans.show_error_message("Must be logged in to create workflows")
+        if (job_ids is None and dataset_ids is None) or workflow_name is None:
+            jobs, warnings = summarize(trans)
+            # Render
+            return trans.fill_template(
+                "workflow/export_writeup.mako",
+                jobs=jobs,
+                warnings=warnings,
+                history=history
+            )
+        else:
+            # If there is just one dataset name selected or one dataset collection, these
+            # come through as string types instead of lists. xref #3247.
+            dataset_names = util.listify(dataset_names)
+            dataset_collection_names = util.listify(dataset_collection_names)
+            stored_workflow = extract_workflow(
+                trans,
+                user=user,
+                job_ids=job_ids,
+                dataset_ids=dataset_ids,
+                dataset_collection_ids=dataset_collection_ids,
+                workflow_name=workflow_name,
+                dataset_names=dataset_names,
+                dataset_collection_names=dataset_collection_names
+            )
+            # Index page with message
+            workflow_id = trans.security.encode_id(stored_workflow.id)
+            return trans.show_message('Workflow "%s" created from current history. '
+                                      'You can <a href="%s" target="_parent">edit</a> or <a href="%s" target="_parent">run</a> the workflow.'
+                                      % (escape(workflow_name), url_for(controller='workflow', action='editor', id=workflow_id),
+                                         url_for(controller='workflows', action='run', id=workflow_id)))
+
+
     @web.expose
     def build_from_current_history(self, trans, job_ids=None, dataset_ids=None, dataset_collection_ids=None, workflow_name=None, dataset_names=None, dataset_collection_names=None):
         user = trans.get_user()
@@ -846,7 +888,7 @@ class WorkflowController(BaseUIController, SharableMixin, UsesStoredWorkflowMixi
                                       'You can <a href="%s" target="_parent">edit</a> or <a href="%s" target="_parent">run</a> the workflow.'
                                       % (escape(workflow_name), url_for(controller='workflow', action='editor', id=workflow_id),
                                          url_for(controller='workflows', action='run', id=workflow_id)))
-
+    
     def get_item(self, trans, id):
         return self.get_stored_workflow(trans, id)
 
