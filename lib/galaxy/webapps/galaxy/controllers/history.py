@@ -1141,78 +1141,6 @@ class HistoryController(BaseUIController, SharableMixin, UsesAnnotations, UsesIt
         return self.get_ave_item_rating_data(trans.sa_session, history)
         # TODO: used in display_base.mako
 
-
-    
-    @web.expose
-    def export_write_up(self, trans, id=None):
-        """  """
-        #
-        # Get history to export.
-        #
-        print("#############################################################")
-        print(dir(self.history_manager.get_current(trans)))        
-        print(dir(self.history_manager.get_current(trans).datasets))
-        print(dir(self.history_manager.get_current(trans).dataset_collections))
-        #print(dir(self))
-        #print(dir(self.))
-        #print(dir(self.history_manager.get_current(trans).datasets.pop())) 
-        print("#############################################################")
-        """
-        for d in range(len(self.history_manager.get_current(trans).datasets)):
-            r = self.history_manager.get_current(trans).datasets.index(d)
-            print(str(r.datatype))
-            print(str(r.hid))
-        """
-
-        print(dir(trans.get_history()))
-        print(dir(trans))
-        print(str(trans.history.to_dict()))
-
-        print("#############################################################")
-
-        # If there is just one dataset name selected or one dataset collection, these
-        # come through as string types instead of lists. xref #3247.
-        """
-        dataset_names = util.listify(dataset_names)
-        dataset_collection_names = util.listify(dataset_collection_names)
-        stored_workflow = extract_workflow(
-            trans,
-            user=user,
-            job_ids=job_ids,
-            dataset_ids=dataset_ids,
-            dataset_collection_ids=dataset_collection_ids,
-            workflow_name=workflow_name,
-            dataset_names=dataset_names,
-            dataset_collection_names=dataset_collection_names
-        )
-        # Index page with message
-        workflow_id = trans.security.encode_id(stored_workflow.id)
-        """
-
-        if id:
-            history = self.history_manager.get_accessible(self.decode_id(id), trans.user, current_history=trans.history)
-        else:
-            # Use current history.
-            history = trans.history
-            id = trans.security.encode_id(history.id)
-        if not history:
-            return trans.show_error_message("This history does not exist or you cannot export this history.")
-        
-        
-        self.queue_history_write_up(trans, history)
-        url = url_for(controller='history', action="export_write_up", id=id, qualified=True)
-        #return self.serve_ready_historian(trans, history)
-        
-        jeha = history.latest_export
-        # print("#############################################################")
-        # print(jeha)
-        
-        #return trans.show_message("Exporting History Write Up '%(n)s'."
-        #                          "Use this link to download the write up: "
-        #                          "<a href='%(u)s'>%(u)s</a>" % ({'n': history.name, 'u': url}))
-        
-
-
     @web.expose
     def export_archive(self, trans, id=None, gzip=True, include_hidden=False, include_deleted=False, preview=False):
         """ Export a history to an archive. """
@@ -1229,8 +1157,6 @@ class HistoryController(BaseUIController, SharableMixin, UsesAnnotations, UsesIt
             return trans.show_error_message("This history does not exist or you cannot export this history.")
         # If history has already been exported and it has not changed since export, stream it.
         jeha = history.latest_export
-        print("#############################################################")
-        print(jeha)
         if jeha and jeha.up_to_date:
             if jeha.ready:
                 if preview:

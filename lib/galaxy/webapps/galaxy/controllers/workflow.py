@@ -927,7 +927,6 @@ class WorkflowController(BaseUIController, SharableMixin, UsesStoredWorkflowMixi
             # Image grabbed all I gotta do now is write it to the output file
             stored = self.get_stored_workflow(trans, workflow_id, check_ownership=True)
             svg = self._workflow_to_svg_canvas(trans, stored).tostring()
-            ##print(svg.tostring())
             workflow_data = self.get_workflow_data(trans, workflow_id)
             
             writeup =  'History: {}\nGalaxy: {}\nUser: {}\n'.format(workflow_data['name'], 'https://usegalaxy.org/', str(trans.user.email))
@@ -937,22 +936,10 @@ class WorkflowController(BaseUIController, SharableMixin, UsesStoredWorkflowMixi
             writeup += self.write_history_inputs(trans)
             writeup += self.write_workflow(trans, workflow_data) 
              
-            #print(writeup)
-           
-
             temp_output_dir = tempfile.mkdtemp()
-            print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
-            print(temp_output_dir)
-            ##print(temp_output_dir)
-            #temp_output_dir.
-            #temp_output_dir.
-            
-            #cd = os.getcwd()
             nd = os.path.join(temp_output_dir, workflow_data['name'] + '_historian')
 
-            #if not os.path.exists(nd):
             os.makedirs(nd)
-            
             
             txt_file_path = os.path.join(nd, "historian_writeup.txt")
             w = open(txt_file_path, 'w')
@@ -960,28 +947,14 @@ class WorkflowController(BaseUIController, SharableMixin, UsesStoredWorkflowMixi
             img_file_path = os.path.join(nd, "historian_img.svg")
             img = open(img_file_path, 'w')
 
-            #for char in writeup:
             w.write(writeup)
-            #for char in svg:
             img.write(svg)
            
-            """
-            print("**********************************")
-            print(writeup)
-            print("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&")
-            print(svg)
-            """
-
             w.close()
             img.close()
             shutil.make_archive(nd, 'zip', nd)
             
-
             return self.serve_ready_historian(trans, workflow_data['name'], nd) 
-             
-            
-
-            #return trans.show_message('Workflow "%s" created from current history.' % (escape(workflow_name)))
 
 
 

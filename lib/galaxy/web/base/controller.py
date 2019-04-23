@@ -1184,22 +1184,14 @@ class UsesVisualizationMixin(UsesLibraryMixinItems):
                     return_message = message
         return return_message
 
-
-
-
 class Historian(object):
-    
+
     def serve_ready_historian(self, trans, name, path):
         trans.response.set_content_type('application/x-tar')
         disposition = 'attachment; filename="{}_historian.zip"'.format(name)
         trans.response.headers["Content-Disposition"] = disposition
         #archive = trans.app.object_store.get_filename(jeha.dataset)
         return open(path + '.zip', mode='rb')
-
-
-
-
-
 
 class UsesStoredWorkflowMixin(SharableItemSecurityMixin, UsesAnnotations):
     """ Mixin for controllers that use StoredWorkflow objects. """

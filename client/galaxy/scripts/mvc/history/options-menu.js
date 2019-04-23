@@ -206,9 +206,6 @@ var menu = [
    	
         html: _l("Export History Write Up"),
         href: "workflow/export_writeup"
-	//html: _l("Export History Write Up"), //********************* Changes here
-	//href: "history/export_write_up",
-	//anon: true
     },
 
     {
