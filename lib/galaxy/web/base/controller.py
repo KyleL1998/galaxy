@@ -383,7 +383,7 @@ class SharableItemSecurityMixin(object):
         """ Security checks for an item: checks if (a) user owns item or (b) item is accessible to user. """
         return managers_base.security_check(trans, item, check_ownership=check_ownership, check_accessible=check_accessible)
 
-
+import os
 class ExportsHistoryMixin(object):
 
     def serve_ready_history_export(self, trans, jeha):
@@ -394,29 +394,8 @@ class ExportsHistoryMixin(object):
             trans.response.set_content_type('application/x-tar')
         disposition = 'attachment; filename="%s"' % jeha.export_name
         trans.response.headers["Content-Disposition"] = disposition
-        print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
-        print(trans.app.object_store.get_filename(jeha.dataset))
         archive = trans.app.object_store.get_filename(jeha.dataset)
         return open(archive, mode='rb')
-
-
-
-
-    def serve_ready_historian(self, trans):#, jeha):
-        trans.response.set_content_type('application/x-tar')
-        disposition = 'attachment; filename="output_historian.zip"'
-        trans.response.headers["Content-Disposition"] = disposition
-        archive = trans.app.object_store.get_filename(jeha.dataset)
-        return open(archive, mode='rb')
-
-    def queue_history_write_up(self, trans, history):
-        historian = trans.app.toolbox.get_tool('__HISTORIAN__')
-        params = {
-            'history_to_export': history
-        }
-        historian.execute(trans , incoming=params, history=history, set_output_hid=True)
-
-
 
     def queue_history_export(self, trans, history, gzip=True, include_hidden=False, include_deleted=False):
         # Convert options to booleans.
@@ -1204,6 +1183,22 @@ class UsesVisualizationMixin(UsesLibraryMixinItems):
                 elif return_message is None and message == "pending":
                     return_message = message
         return return_message
+
+
+
+
+class Historian(object):
+    
+    def serve_ready_historian(self, trans, name, path):
+        trans.response.set_content_type('application/x-tar')
+        disposition = 'attachment; filename="{}_historian.zip"'.format(name)
+        trans.response.headers["Content-Disposition"] = disposition
+        #archive = trans.app.object_store.get_filename(jeha.dataset)
+        return open(path + '.zip', mode='rb')
+
+
+
+
 
 
 class UsesStoredWorkflowMixin(SharableItemSecurityMixin, UsesAnnotations):

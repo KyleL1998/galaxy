@@ -102,6 +102,7 @@ def main():
     gzip = bool(options.gzip)
     history_attrs, dataset_attrs, job_attrs, out_file = args
 
+
     # Create archive.
     status = create_archive(history_attrs, dataset_attrs, job_attrs, out_file, gzip)
     print(status)

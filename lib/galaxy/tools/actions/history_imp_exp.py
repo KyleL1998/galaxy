@@ -207,6 +207,8 @@ class ExportHistoryToolAction(ToolAction):
         #
         # Add parameters to job_parameter table.
         #
+        print("************************************************Execute")
+        print(cmd_line)
 
         # Set additional parameters.
         incoming['__HISTORY_TO_EXPORT__'] = history.id

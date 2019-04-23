@@ -3,6 +3,11 @@ from __future__ import absolute_import
 import base64
 import json
 import logging
+import re
+
+import os
+import tempfile
+import shutil
 
 from markupsafe import escape
 from six.moves.html_parser import HTMLParser
@@ -30,7 +35,8 @@ from galaxy.web import error, url_for
 from galaxy.web.base.controller import (
     BaseUIController,
     SharableMixin,
-    UsesStoredWorkflowMixin
+    UsesStoredWorkflowMixin,
+    Historian
 )
 from galaxy.web.framework.helpers import (
     grids,
@@ -177,7 +183,7 @@ class SingleTagContentsParser(HTMLParser):
             self.tag_content += text
 
 
-class WorkflowController(BaseUIController, SharableMixin, UsesStoredWorkflowMixin, UsesItemRatings):
+class WorkflowController(BaseUIController, SharableMixin, UsesStoredWorkflowMixin, Historian, UsesItemRatings):
     stored_list_grid = StoredWorkflowListGrid()
     published_list_grid = StoredWorkflowAllPublishedGrid()
 
@@ -745,6 +751,8 @@ class WorkflowController(BaseUIController, SharableMixin, UsesStoredWorkflowMixi
         stored = self.get_stored_workflow(trans, id, check_ownership=False, check_accessible=True)
         return self._workflow_to_dict(trans, stored)
 
+
+
     @web.json_pretty
     def export_to_file(self, trans, id):
         """
@@ -813,6 +821,74 @@ class WorkflowController(BaseUIController, SharableMixin, UsesStoredWorkflowMixi
 
 
 
+    def get_workflow_data(self, trans, id):
+        stored = self.get_stored_workflow(trans, id, check_ownership=False, check_accessible=True)
+        return self._workflow_to_dict(trans, stored)
+
+    def write_workflow(self, trans, workflow):
+        '''
+        write_workflow
+            dict: workflow - the workflow you want to write
+            output: writer
+        write all the steps of a workflow
+        '''
+        names = []
+        writer = '\n\nTool List(s):\n--------------------------------------\n'
+        for key, value in workflow['steps'].iteritems():  # Iterate through each step of the workflow
+            if value['tool_id'] is None:  # Input step
+                names.append(json.loads(value['tool_state'])['name'])
+            else:  # Tool step
+                names.append(value['tool_id'])
+                writer += "- Name: {}\n".format(names[value['id']])
+
+                inputs = value['input_connections']
+                writer += "- Input(s):\n"
+                for w_type, w_input in inputs.iteritems():  # Write all input sources
+                    writer += "   * {}: {}\n".format(w_type, names[w_input['id']])
+
+                writer += "- Tool parameters:\n"
+                # Split on comma unless that comma is in []
+                split_value = (re.split(r',\s*(?![^[]]*\))', str(value['tool_state'])))
+                for param in split_value:  # Write all tool parameters except ones excluded right below
+                    if "null" not in param and 'chromInfo' not in param and '__workflow' not in param:
+                        bad_chars = '{}\'\\[]"'  # Unwanted characters that are stuck to the string from its extraction
+                        for c in bad_chars:
+                            param = param.replace(c, "")
+                        writer += "   * {}\n".format(param.strip())
+                writer += "\n"
+        return writer
+
+    def write_history_inputs(self, trans):
+        hist = trans.get_history()
+        inputs = ""
+
+        collections = hist.visible_dataset_collections 
+        datasets = hist.visible_datasets
+        
+        for i in range(len(collections)): #range(1):
+            col = collections[i].to_dict()
+            if col['job_source_id'] is None:
+                inputs += '- {}(Type: {})\n- Sample Names:\n'.format(str(col['name']), str(col['collection_type']))
+                col_pieces = collections[i].dataset_instances
+                if 'list:paired' in col['collection_type']:
+                    inputs += '    * {}\n'.format(str(collections[i].collection.elements[0].element_identifier))
+                    for j in range(len(col_pieces)):
+                        inputs += '      - {}\n'.format(str(col_pieces[j].to_dict()['name']))
+                elif 'paired' in col['collection_type']:
+                    for k in range(2):
+                        inputs += '    - {}\n'.format(str(collections[(1-k)].collection.elements[k].element_identifier))
+                        inputs += '      *  {}\n'.format(str(col_pieces[(1-k)].to_dict()['name']))
+                else:
+                    for j in range(len(col_pieces)):
+                        inputs += '    * {}\n'.format(str(col_pieces[j].to_dict()['name']))
+
+        for data in datasets:
+            if 'uploaded' in data.to_dict()['misc_info']:
+                inputs += '- {}\n- Source: {}'.format(str(data.to_dict()['name']), str(data.to_dict()['misc_info']))
+        return inputs
+
+
+
 
     @web.expose
     def export_writeup(self, trans, job_ids=None, dataset_ids=None, dataset_collection_ids=None, workflow_name=None, dataset_names=None, dataset_collection_names=None):
@@ -845,11 +921,73 @@ class WorkflowController(BaseUIController, SharableMixin, UsesStoredWorkflowMixi
                 dataset_collection_names=dataset_collection_names
             )
             # Index page with message
+            
             workflow_id = trans.security.encode_id(stored_workflow.id)
-            return trans.show_message('Workflow "%s" created from current history. '
-                                      'You can <a href="%s" target="_parent">edit</a> or <a href="%s" target="_parent">run</a> the workflow.'
-                                      % (escape(workflow_name), url_for(controller='workflow', action='editor', id=workflow_id),
-                                         url_for(controller='workflows', action='run', id=workflow_id)))
+            
+            # Image grabbed all I gotta do now is write it to the output file
+            stored = self.get_stored_workflow(trans, workflow_id, check_ownership=True)
+            svg = self._workflow_to_svg_canvas(trans, stored).tostring()
+            ##print(svg.tostring())
+            workflow_data = self.get_workflow_data(trans, workflow_id)
+            
+            writeup =  'History: {}\nGalaxy: {}\nUser: {}\n'.format(workflow_data['name'], 'https://usegalaxy.org/', str(trans.user.email))
+            writeup += '--------------------------------------\n\n\n\nImage saved as historian_img.svg\n\n\n\n'
+            writeup += 'History Input(s):\n--------------------------------------\n'
+            
+            writeup += self.write_history_inputs(trans)
+            writeup += self.write_workflow(trans, workflow_data) 
+             
+            #print(writeup)
+           
+
+            temp_output_dir = tempfile.mkdtemp()
+            print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
+            print(temp_output_dir)
+            ##print(temp_output_dir)
+            #temp_output_dir.
+            #temp_output_dir.
+            
+            #cd = os.getcwd()
+            nd = os.path.join(temp_output_dir, workflow_data['name'] + '_historian')
+
+            #if not os.path.exists(nd):
+            os.makedirs(nd)
+            
+            
+            txt_file_path = os.path.join(nd, "historian_writeup.txt")
+            w = open(txt_file_path, 'w')
+            
+            img_file_path = os.path.join(nd, "historian_img.svg")
+            img = open(img_file_path, 'w')
+
+            #for char in writeup:
+            w.write(writeup)
+            #for char in svg:
+            img.write(svg)
+           
+            """
+            print("**********************************")
+            print(writeup)
+            print("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&")
+            print(svg)
+            """
+
+            w.close()
+            img.close()
+            shutil.make_archive(nd, 'zip', nd)
+            
+
+            return self.serve_ready_historian(trans, workflow_data['name'], nd) 
+             
+            
+
+            #return trans.show_message('Workflow "%s" created from current history.' % (escape(workflow_name)))
+
+
+
+
+
+
 
 
     @web.expose
